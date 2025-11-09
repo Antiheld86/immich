@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-
+import { Transform } from 'class-transformer';
 import { IsString } from 'class-validator';
 import { AssetOrder, AssetVisibility } from 'src/enum';
 import { ValidateBoolean, ValidateEnum, ValidateUUID } from 'src/validation';
@@ -11,6 +11,7 @@ export class TimeBucketDto {
   @ValidateUUID({ optional: true, description: 'Filter assets belonging to a specific album' })
   albumId?: string;
 
+  @Transform(({ value }) => (Array.isArray(value) ? value : value ? [value] : undefined))
   @ValidateUUID({ optional: true, each: true, description: 'Filter assets from specific shared albums (user must have access)' })
   albumIds?: string[];
 

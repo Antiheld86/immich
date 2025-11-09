@@ -23,7 +23,7 @@
       sharedAlbums = allSharedAlbums.filter((album) => album.ownerId !== $user?.id);
     } catch (e) {
       console.error('Failed to load shared albums:', e);
-      error = 'Failed to load shared albums';
+      error = $t('failed_to_load_shared_albums');
     } finally {
       loading = false;
     }
@@ -52,43 +52,50 @@
 
 <div class="space-y-2">
   {#if loading}
-    <p class="text-sm text-gray-500 dark:text-gray-400">{$t('loading')}</p>
+    <p class="text-sm text-gray-500 dark:text-gray-400" role="status">{$t('loading')}</p>
   {:else if error}
-    <p class="text-sm text-red-500">{error}</p>
+    <p class="text-sm text-red-500" role="alert">{error}</p>
   {:else if sharedAlbums.length === 0}
     <p class="text-sm text-gray-500 dark:text-gray-400">{$t('no_albums_shared_with_you')}</p>
   {:else}
     <div class="flex justify-between items-center mb-2">
-      <span class="text-sm font-medium">
-        {selectedIds.length} of {sharedAlbums.length} selected
+      <span class="text-sm text-gray-700 dark:text-gray-300" aria-live="polite" aria-atomic="true">
+        {selectedIds.length} / {sharedAlbums.length}
       </span>
       <div class="flex gap-2">
         <button
           type="button"
           onclick={selectAll}
-          class="text-xs text-immich-primary dark:text-immich-dark-primary hover:underline"
+          aria-label={$t('select_all')}
+          class="text-xs text-immich-primary dark:text-immich-dark-primary hover:underline focus:outline-none focus:ring-2 focus:ring-immich-primary rounded px-1"
         >
           {$t('select_all')}
         </button>
         <button
           type="button"
           onclick={clearAll}
-          class="text-xs text-immich-primary dark:text-immich-dark-primary hover:underline"
+          aria-label={$t('clear_all')}
+          class="text-xs text-immich-primary dark:text-immich-dark-primary hover:underline focus:outline-none focus:ring-2 focus:ring-immich-primary rounded px-1"
         >
           {$t('clear_all')}
         </button>
       </div>
     </div>
 
-    <div class="max-h-64 overflow-y-auto space-y-1 border border-gray-200 dark:border-gray-700 rounded-lg p-2">
-      {#each sharedAlbums as album}
+    <div
+      role="group"
+      aria-label="Shared albums"
+      class="max-h-64 overflow-y-auto space-y-1 border border-gray-200 dark:border-gray-700 rounded-lg p-2"
+    >
+      {#each sharedAlbums as album (album.id)}
         <label
-          class="flex items-start gap-3 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer transition-colors"
+          class="flex items-start gap-3 p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer transition-colors focus-within:ring-2 focus-within:ring-immich-primary"
         >
           <input
             type="checkbox"
             checked={selectedIds.includes(album.id)}
             onchange={() => toggleAlbum(album.id)}
+            aria-label={album.albumName}
             class="mt-1 h-4 w-4 rounded border-gray-300 text-immich-primary focus:ring-immich-primary dark:border-gray-600 dark:bg-gray-700"
           />
           <div class="flex-1 min-w-0">

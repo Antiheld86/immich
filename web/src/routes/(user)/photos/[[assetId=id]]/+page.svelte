@@ -61,9 +61,6 @@
 
   const handleTimelineSettings = (settings?: typeof $timelineSettings) => {
     showTimelineSettings = false;
-    if (settings) {
-      $timelineSettings = settings;
-    }
   };
 
   let selectedAssets = $derived(assetInteraction.selectedAssets);
