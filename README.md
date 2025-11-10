@@ -1,3 +1,10 @@
+## Fork discription
+
+This is a fork of the Immich High performance self-hosted photo and video management solution with added features which are not yet implemented in the official repo.
+
+Features added:
+- show shared albums in the timeline (only web so far)
+
 <p align="center"> 
   <br/>
   <a href="https://opensource.org/license/agpl-v3"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg?color=3F51B5&style=for-the-badge&label=License&logoColor=000000&labelColor=ececec" alt="License: AGPLv3"></a>
@@ -38,13 +45,6 @@
   <a href="readme_i18n/README_vi_VN.md">Tiếng Việt</a>
   <a href="readme_i18n/README_th_TH.md">ภาษาไทย</a>
 </p>
-
-## Fork discription
-
-> This is a fork of the Immich High performance self-hosted photo and video management solution with added features which are not yet implemented in the official repo.
->
-> Features added:
-> - show shared albums in the timeline (only web so far)
 
 > [!WARNING]
 > ⚠️ Always follow [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) backup plan for your precious photos and videos!
