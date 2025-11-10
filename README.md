@@ -39,6 +39,10 @@
   <a href="readme_i18n/README_th_TH.md">ภาษาไทย</a>
 </p>
 
+> This is a fork of the Immich High performance self-hosted photo and video management solution with added features with are not yet implemented in the official repo.
+>
+> Features added:
+> - show shared albums in the timeline (only web so far)
 
 > [!WARNING]
 > ⚠️ Always follow [3-2-1](https://www.backblaze.com/blog/the-3-2-1-backup-strategy/) backup plan for your precious photos and videos!
