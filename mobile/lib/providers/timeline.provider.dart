@@ -2,6 +2,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:immich_mobile/entities/asset.entity.dart';
 import 'package:immich_mobile/providers/album/album.provider.dart';
 import 'package:immich_mobile/providers/locale_provider.dart';
+import 'package:immich_mobile/providers/shared_albums.provider.dart';
 import 'package:immich_mobile/services/timeline.service.dart';
 import 'package:immich_mobile/widgets/asset_grid/asset_grid_data_structure.dart';
 
@@ -11,15 +12,19 @@ final singleUserTimelineProvider = StreamProvider.family<RenderList, String?>((r
   }
 
   ref.watch(localeProvider);
+  // Watch shared album selection to trigger timeline refresh when albums change
+  ref.watch(selectedSharedAlbumIdsProvider);
   final timelineService = ref.watch(timelineServiceProvider);
   return timelineService.watchHomeTimeline(userId);
-}, dependencies: [localeProvider]);
+}, dependencies: [localeProvider, selectedSharedAlbumIdsProvider]);
 
 final multiUsersTimelineProvider = StreamProvider.family<RenderList, List<String>>((ref, userIds) {
   ref.watch(localeProvider);
+  // Watch shared album selection to trigger timeline refresh when albums change
+  ref.watch(selectedSharedAlbumIdsProvider);
   final timelineService = ref.watch(timelineServiceProvider);
   return timelineService.watchMultiUsersTimeline(userIds);
-}, dependencies: [localeProvider]);
+}, dependencies: [localeProvider, selectedSharedAlbumIdsProvider]);
 
 final albumTimelineProvider = StreamProvider.autoDispose.family<RenderList, int>((ref, id) {
   final album = ref.watch(albumWatcher(id)).value;
