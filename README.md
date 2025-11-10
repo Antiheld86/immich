@@ -39,6 +39,8 @@
   <a href="readme_i18n/README_th_TH.md">ภาษาไทย</a>
 </p>
 
+## Fork discription
+
 > This is a fork of the Immich High performance self-hosted photo and video management solution with added features which are not yet implemented in the official repo.
 >
 > Features added:
