@@ -247,6 +247,82 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
         .get();
   }
 
+  /// Watches shared album IDs that should be included in the timeline
+  /// Returns album IDs where showInTimeline is explicitly true or null (when global setting is enabled)
+  Stream<List<String>> watchSelectedSharedAlbumIds(String userId, bool globalEnabled) {
+    // If global is disabled, only return explicitly enabled albums
+    // If global is enabled, return all albums except explicitly disabled ones
+    final query = _db.remoteAlbumUserEntity.selectOnly()
+      ..addColumns([_db.remoteAlbumUserEntity.albumId])
+      ..join([
+        innerJoin(
+          _db.remoteAlbumEntity,
+          _db.remoteAlbumEntity.id.equalsExp(_db.remoteAlbumUserEntity.albumId),
+          useColumns: false,
+        ),
+      ])
+      ..where(_db.remoteAlbumUserEntity.userId.equals(userId));
+
+    if (globalEnabled) {
+      // Global enabled: exclude only explicitly disabled albums (showInTimeline = false)
+      query.where(_db.remoteAlbumUserEntity.showInTimeline.isNull() | _db.remoteAlbumUserEntity.showInTimeline.equals(true));
+      // Also filter out user-owned albums (they're already in timeline)
+      query.where(_db.remoteAlbumEntity.ownerId.notEquals(userId));
+    } else {
+      // Global disabled: include only explicitly enabled albums (showInTimeline = true)
+      query.where(_db.remoteAlbumUserEntity.showInTimeline.equals(true));
+      // Filter out user-owned albums
+      query.where(_db.remoteAlbumEntity.ownerId.notEquals(userId));
+    }
+
+    return query
+        .map((row) => row.read(_db.remoteAlbumUserEntity.albumId)!)
+        .watch();
+  }
+
+  /// Gets the timeline visibility setting for a specific album
+  Future<bool?> getAlbumTimelineVisibility(String albumId, String userId) async {
+    final query = _db.remoteAlbumUserEntity.select()
+      ..where((row) => row.albumId.equals(albumId) & row.userId.equals(userId));
+
+    final result = await query.getSingleOrNull();
+    return result?.showInTimeline;
+  }
+
+  /// Sets the timeline visibility for a specific album
+  /// Pass null to inherit from global setting, true to show, false to hide
+  Future<void> setAlbumTimelineVisibility(String albumId, String userId, bool? showInTimeline) async {
+    await (_db.update(_db.remoteAlbumUserEntity)
+      ..where((row) => row.albumId.equals(albumId) & row.userId.equals(userId)))
+        .write(RemoteAlbumUserEntityCompanion(showInTimeline: Value(showInTimeline)));
+  }
+
+  /// Watches all shared albums with their timeline visibility state
+  Stream<List<AlbumWithVisibility>> watchSharedAlbumsWithVisibility(String userId) {
+    final query = _db.remoteAlbumUserEntity.select().join([
+      innerJoin(
+        _db.remoteAlbumEntity,
+        _db.remoteAlbumEntity.id.equalsExp(_db.remoteAlbumUserEntity.albumId),
+      ),
+      innerJoin(
+        _db.userEntity,
+        _db.userEntity.id.equalsExp(_db.remoteAlbumEntity.ownerId),
+      ),
+    ])
+      ..where(_db.remoteAlbumUserEntity.userId.equals(userId))
+      // Filter out user-owned albums
+      ..where(_db.remoteAlbumEntity.ownerId.notEquals(userId))
+      ..orderBy([OrderingTerm.desc(_db.remoteAlbumEntity.updatedAt)]);
+
+    return query.watch().map((rows) => rows.map((row) {
+      final album = row.readTable(_db.remoteAlbumEntity).toDto(
+        owner: row.readTable(_db.userEntity).toDto(),
+      );
+      final visibility = row.read(_db.remoteAlbumUserEntity.showInTimeline);
+      return AlbumWithVisibility(album: album, showInTimeline: visibility);
+    }).toList());
+  }
+
   TimelineQuery fromAssets(List<BaseAsset> assets, TimelineOrigin origin) => (
     bucketSource: () => Stream.value(_generateBuckets(assets.length)),
     assetSource: (offset, count) => Future.value(assets.skip(offset).take(count).toList(growable: false)),

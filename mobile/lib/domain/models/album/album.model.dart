@@ -122,3 +122,37 @@ class RemoteAlbum {
     );
   }
 }
+
+/// Model combining an album with its timeline visibility state
+class AlbumWithVisibility {
+  final RemoteAlbum album;
+  final bool? showInTimeline; // null = inherit, true = show, false = hide
+
+  const AlbumWithVisibility({
+    required this.album,
+    required this.showInTimeline,
+  });
+
+  /// Computes effective visibility based on global setting
+  bool isVisibleInTimeline(bool globalEnabled) {
+    if (showInTimeline != null) return showInTimeline!;
+    // Inherit from global setting
+    return globalEnabled;
+  }
+
+  @override
+  String toString() {
+    return 'AlbumWithVisibility(album: ${album.name}, showInTimeline: $showInTimeline)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is AlbumWithVisibility &&
+        other.album == album &&
+        other.showInTimeline == showInTimeline;
+  }
+
+  @override
+  int get hashCode => album.hashCode ^ showInTimeline.hashCode;
+}
