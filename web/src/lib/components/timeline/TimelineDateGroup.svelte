@@ -135,6 +135,7 @@
   };
 </script>
 
+{#if monthGroup.timelineManager.isInitialized}
 {#each filterIntersecting(monthGroup.dayGroups) as dayGroup, groupIndex (dayGroup.day)}
   {@const absoluteWidth = dayGroup.left}
 
@@ -235,6 +236,7 @@
     </div>
   </section>
 {/each}
+{/if}
 
 <style>
   section {

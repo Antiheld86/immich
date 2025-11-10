@@ -5,7 +5,7 @@ import { InjectKysely } from 'nestjs-kysely';
 import { Stack } from 'src/database';
 import { Chunked, ChunkedArray, DummyValue, GenerateSql } from 'src/decorators';
 import { AuthDto } from 'src/dtos/auth.dto';
-import { AssetFileType, AssetMetadataKey, AssetOrder, AssetStatus, AssetType, AssetVisibility } from 'src/enum';
+import { AlbumUserRole, AssetFileType, AssetMetadataKey, AssetOrder, AssetStatus, AssetType, AssetVisibility } from 'src/enum';
 import { DB } from 'src/schema';
 import { AssetExifTable } from 'src/schema/tables/asset-exif.table';
 import { AssetFileTable } from 'src/schema/tables/asset-file.table';
@@ -57,6 +57,9 @@ interface AssetBuilderOptions {
   personId?: string;
   userIds?: string[];
   withStacked?: boolean;
+  withSharedAlbums?: boolean;
+  sharedAlbumsUserId?: string;
+  specificAlbumIds?: string[];
   exifInfo?: boolean;
   status?: AssetStatus;
   assetType?: AssetType;
@@ -574,7 +577,43 @@ export class AssetRepository {
               )
               .where((eb) => eb.or([eb('asset.stackId', 'is', null), eb(eb.table('stack'), 'is not', null)])),
           )
-          .$if(!!options.userIds, (qb) => qb.where('asset.ownerId', '=', anyUuid(options.userIds!)))
+          .$if(!!options.userIds, (qb) => {
+            // Priority: specific album selection > all shared albums
+            if (options.specificAlbumIds !== undefined) {
+              if (options.specificAlbumIds.length === 0) {
+                // User has access to no albums, only show owned assets
+                return qb.where('asset.ownerId', '=', anyUuid(options.userIds!));
+              }
+              // Show owned assets OR assets from specific albums
+              return qb.where((eb) =>
+                eb.or([
+                  eb('asset.ownerId', '=', anyUuid(options.userIds!)),
+                  eb.exists(
+                    eb
+                      .selectFrom('album_asset')
+                      .whereRef('album_asset.assetId', '=', 'asset.id')
+                      .where('album_asset.albumId', 'in', options.specificAlbumIds!),
+                  ),
+                ]),
+              );
+            }
+            if (options.withSharedAlbums && options.sharedAlbumsUserId) {
+              return qb.where((eb) =>
+                eb.or([
+                  eb('asset.ownerId', '=', anyUuid(options.userIds!)),
+                  eb.exists(
+                    eb
+                      .selectFrom('album_asset')
+                      .innerJoin('album_user', 'album_asset.albumId', 'album_user.albumId')
+                      .whereRef('album_asset.assetId', '=', 'asset.id')
+                      .where('album_user.userId', '=', options.sharedAlbumsUserId!)
+                      .where('album_user.role', 'in', [AlbumUserRole.Editor, AlbumUserRole.Viewer]),
+                  ),
+                ]),
+              );
+            }
+            return qb.where('asset.ownerId', '=', anyUuid(options.userIds!));
+          })
           .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
           .$if(!!options.assetType, (qb) => qb.where('asset.type', '=', options.assetType!))
           .$if(options.isDuplicate !== undefined, (qb) =>
@@ -632,6 +671,48 @@ export class AssetRepository {
               .as('ratio'),
           ])
           .$if(!!options.withCoordinates, (qb) => qb.select(['asset_exif.latitude', 'asset_exif.longitude']))
+          .$if(
+            (!!options.withSharedAlbums && !!options.sharedAlbumsUserId) ||
+              (!!options.specificAlbumIds && options.specificAlbumIds.length > 0),
+            (qb) => {
+              if (options.specificAlbumIds !== undefined && options.specificAlbumIds.length > 0) {
+                // For specific albums, just get album info without role check
+                return qb
+                  .leftJoinLateral(
+                    (eb) =>
+                      eb
+                        .selectFrom('album_asset')
+                        .innerJoin('album', 'album_asset.albumId', 'album.id')
+                        .select(['album.id as albumId', 'album.albumName as albumName'])
+                        .whereRef('album_asset.assetId', '=', 'asset.id')
+                        .where('album_asset.albumId', 'in', options.specificAlbumIds!)
+                        .where('album.deletedAt', 'is', null)
+                        .limit(1)
+                        .as('shared_album'),
+                    (join) => join.onTrue(),
+                  )
+                  .select(['shared_album.albumId', 'shared_album.albumName']);
+              }
+              // For all shared albums, check user role
+              return qb
+                .leftJoinLateral(
+                  (eb) =>
+                    eb
+                      .selectFrom('album_asset')
+                      .innerJoin('album_user', 'album_asset.albumId', 'album_user.albumId')
+                      .innerJoin('album', 'album_asset.albumId', 'album.id')
+                      .select(['album.id as albumId', 'album.albumName as albumName'])
+                      .whereRef('album_asset.assetId', '=', 'asset.id')
+                      .where('album_user.userId', '=', options.sharedAlbumsUserId!)
+                      .where('album_user.role', 'in', [AlbumUserRole.Editor, AlbumUserRole.Viewer])
+                      .where('album.deletedAt', 'is', null)
+                      .limit(1)
+                      .as('shared_album'),
+                  (join) => join.onTrue(),
+                )
+                .select(['shared_album.albumId', 'shared_album.albumName']);
+            },
+          )
           .where('asset.deletedAt', options.isTrashed ? 'is not' : 'is', null)
           .$if(options.visibility == undefined, withDefaultVisibility)
           .$if(!!options.visibility, (qb) => qb.where('asset.visibility', '=', options.visibility!))
@@ -647,7 +728,43 @@ export class AssetRepository {
             ),
           )
           .$if(!!options.personId, (qb) => hasPeople(qb, [options.personId!]))
-          .$if(!!options.userIds, (qb) => qb.where('asset.ownerId', '=', anyUuid(options.userIds!)))
+          .$if(!!options.userIds, (qb) => {
+            // Priority: specific album selection > all shared albums
+            if (options.specificAlbumIds !== undefined) {
+              if (options.specificAlbumIds.length === 0) {
+                // User has access to no albums, only show owned assets
+                return qb.where('asset.ownerId', '=', anyUuid(options.userIds!));
+              }
+              // Show owned assets OR assets from specific albums
+              return qb.where((eb) =>
+                eb.or([
+                  eb('asset.ownerId', '=', anyUuid(options.userIds!)),
+                  eb.exists(
+                    eb
+                      .selectFrom('album_asset')
+                      .whereRef('album_asset.assetId', '=', 'asset.id')
+                      .where('album_asset.albumId', 'in', options.specificAlbumIds!),
+                  ),
+                ]),
+              );
+            }
+            if (options.withSharedAlbums && options.sharedAlbumsUserId) {
+              return qb.where((eb) =>
+                eb.or([
+                  eb('asset.ownerId', '=', anyUuid(options.userIds!)),
+                  eb.exists(
+                    eb
+                      .selectFrom('album_asset')
+                      .innerJoin('album_user', 'album_asset.albumId', 'album_user.albumId')
+                      .whereRef('album_asset.assetId', '=', 'asset.id')
+                      .where('album_user.userId', '=', options.sharedAlbumsUserId!)
+                      .where('album_user.role', 'in', [AlbumUserRole.Editor, AlbumUserRole.Viewer]),
+                  ),
+                ]),
+              );
+            }
+            return qb.where('asset.ownerId', '=', anyUuid(options.userIds!));
+          })
           .$if(options.isFavorite !== undefined, (qb) => qb.where('asset.isFavorite', '=', options.isFavorite!))
           .$if(!!options.withStacked, (qb) =>
             qb
@@ -705,6 +822,12 @@ export class AssetRepository {
             eb.fn.coalesce(eb.fn('array_agg', ['status']), sql.lit('{}')).as('status'),
             eb.fn.coalesce(eb.fn('array_agg', ['thumbhash']), sql.lit('{}')).as('thumbhash'),
           ])
+          .$if(!!options.withSharedAlbums, (qb) =>
+            qb.select((eb) => [
+              eb.fn.coalesce(eb.fn('array_agg', ['albumId']), sql.lit('{}')).as('albumId'),
+              eb.fn.coalesce(eb.fn('array_agg', ['albumName']), sql.lit('{}')).as('albumName'),
+            ]),
+          )
           .$if(!!options.withCoordinates, (qb) =>
             qb.select((eb) => [
               eb.fn.coalesce(eb.fn('array_agg', ['latitude']), sql.lit('{}')).as('latitude'),

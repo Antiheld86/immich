@@ -23,10 +23,12 @@
   import Timeline from '$lib/components/timeline/Timeline.svelte';
   import { AssetAction } from '$lib/constants';
   import { TimelineManager } from '$lib/managers/timeline-manager/timeline-manager.svelte';
+  import TimelineSettingsModal from '$lib/modals/TimelineSettingsModal.svelte';
   import { AssetInteraction } from '$lib/stores/asset-interaction.svelte';
   import { assetViewingStore } from '$lib/stores/asset-viewing.store';
   import { isFaceEditMode } from '$lib/stores/face-edit.svelte';
   import { preferences, user } from '$lib/stores/user.store';
+  import { timelineSettings } from '$lib/stores/preferences.store';
   import {
     updateStackedAssetInTimeline,
     updateUnstackedAssetInTimeline,
@@ -36,15 +38,30 @@
   import { openFileUploadDialog } from '$lib/utils/file-uploader';
   import { AssetVisibility } from '@immich/sdk';
 
-  import { mdiDotsVertical, mdiPlus } from '@mdi/js';
+  import { mdiDotsVertical, mdiPlus, mdiTune } from '@mdi/js';
+  import { Icon, IconButton } from '@immich/ui';
 
   import { t } from 'svelte-i18n';
+  import { scale } from 'svelte/transition';
 
   let { isViewing: showAssetViewer } = assetViewingStore;
   let timelineManager = $state<TimelineManager>() as TimelineManager;
-  const options = { visibility: AssetVisibility.Timeline, withStacked: true, withPartners: true };
+  let showTimelineSettings = $state(false);
+
+  let options = $derived({
+    visibility: AssetVisibility.Timeline,
+    withStacked: true,
+    withPartners: $timelineSettings.withPartners,
+    withSharedAlbums: $timelineSettings.withSharedAlbums,
+    albumIds:
+      $timelineSettings.selectedSharedAlbumIds.length > 0 ? $timelineSettings.selectedSharedAlbumIds : undefined,
+  });
 
   const assetInteraction = new AssetInteraction();
+
+  const handleTimelineSettings = (settings?: typeof $timelineSettings) => {
+    showTimelineSettings = false;
+  };
 
   let selectedAssets = $derived(assetInteraction.selectedAssets);
   let isAssetStackSelected = $derived(selectedAssets.length === 1 && !!selectedAssets[0].stack);
@@ -105,6 +122,24 @@
     {/snippet}
   </Timeline>
 </UserPageLayout>
+
+{#if !assetInteraction.selectionActive}
+  <button
+    type="button"
+    class="fixed bottom-20 right-6 md:bottom-6 md:right-20 z-50 rounded-full bg-immich-primary p-5 md:p-4 text-white shadow-lg hover:bg-immich-primary/90 hover:shadow-xl dark:bg-immich-dark-primary dark:hover:bg-immich-dark-primary/90 transition-all duration-200 active:scale-95"
+    title={$t('timeline_settings')}
+    aria-label={$t('timeline_settings')}
+    onclick={() => (showTimelineSettings = true)}
+    in:scale={{ duration: 200, start: 0.8 }}
+    out:scale={{ duration: 200, start: 0.8 }}
+  >
+    <Icon icon={mdiTune} size="24" ariaHidden />
+  </button>
+{/if}
+
+{#if showTimelineSettings}
+  <TimelineSettingsModal settings={$timelineSettings} onClose={handleTimelineSettings} />
+{/if}
 
 {#if assetInteraction.selectionActive}
   <AssetSelectControlBar

@@ -1610,6 +1610,10 @@ export type TagUpdateDto = {
     color?: string | null;
 };
 export type TimeBucketAssetResponseDto = {
+    /** Array of album IDs for assets from shared albums (null for owned assets) */
+    albumId?: (string | null)[];
+    /** Array of album names for assets from shared albums (null for owned assets) */
+    albumName?: (string | null)[];
     /** Array of city names extracted from EXIF GPS data */
     city: (string | null)[];
     /** Array of country names extracted from EXIF GPS data */
@@ -4404,8 +4408,9 @@ export function tagAssets({ id, bulkIdsDto }: {
 /**
  * This endpoint requires the `asset.read` permission.
  */
-export function getTimeBucket({ albumId, isFavorite, isTrashed, key, order, personId, slug, tagId, timeBucket, userId, visibility, withCoordinates, withPartners, withStacked }: {
+export function getTimeBucket({ albumId, albumIds, isFavorite, isTrashed, key, order, personId, slug, tagId, timeBucket, userId, visibility, withCoordinates, withPartners, withSharedAlbums, withStacked }: {
     albumId?: string;
+    albumIds?: string[];
     isFavorite?: boolean;
     isTrashed?: boolean;
     key?: string;
@@ -4418,6 +4423,7 @@ export function getTimeBucket({ albumId, isFavorite, isTrashed, key, order, pers
     visibility?: AssetVisibility;
     withCoordinates?: boolean;
     withPartners?: boolean;
+    withSharedAlbums?: boolean;
     withStacked?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
@@ -4425,6 +4431,7 @@ export function getTimeBucket({ albumId, isFavorite, isTrashed, key, order, pers
         data: TimeBucketAssetResponseDto;
     }>(`/timeline/bucket${QS.query(QS.explode({
         albumId,
+        albumIds,
         isFavorite,
         isTrashed,
         key,
@@ -4437,6 +4444,7 @@ export function getTimeBucket({ albumId, isFavorite, isTrashed, key, order, pers
         visibility,
         withCoordinates,
         withPartners,
+        withSharedAlbums,
         withStacked
     }))}`, {
         ...opts
@@ -4445,8 +4453,9 @@ export function getTimeBucket({ albumId, isFavorite, isTrashed, key, order, pers
 /**
  * This endpoint requires the `asset.read` permission.
  */
-export function getTimeBuckets({ albumId, isFavorite, isTrashed, key, order, personId, slug, tagId, userId, visibility, withCoordinates, withPartners, withStacked }: {
+export function getTimeBuckets({ albumId, albumIds, isFavorite, isTrashed, key, order, personId, slug, tagId, userId, visibility, withCoordinates, withPartners, withSharedAlbums, withStacked }: {
     albumId?: string;
+    albumIds?: string[];
     isFavorite?: boolean;
     isTrashed?: boolean;
     key?: string;
@@ -4458,6 +4467,7 @@ export function getTimeBuckets({ albumId, isFavorite, isTrashed, key, order, per
     visibility?: AssetVisibility;
     withCoordinates?: boolean;
     withPartners?: boolean;
+    withSharedAlbums?: boolean;
     withStacked?: boolean;
 }, opts?: Oazapfts.RequestOpts) {
     return oazapfts.ok(oazapfts.fetchJson<{
@@ -4465,6 +4475,7 @@ export function getTimeBuckets({ albumId, isFavorite, isTrashed, key, order, per
         data: TimeBucketsResponseDto[];
     }>(`/timeline/buckets${QS.query(QS.explode({
         albumId,
+        albumIds,
         isFavorite,
         isTrashed,
         key,
@@ -4476,6 +4487,7 @@ export function getTimeBuckets({ albumId, isFavorite, isTrashed, key, order, per
         visibility,
         withCoordinates,
         withPartners,
+        withSharedAlbums,
         withStacked
     }))}`, {
         ...opts
