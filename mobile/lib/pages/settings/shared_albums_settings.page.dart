@@ -11,6 +11,7 @@ import 'package:immich_mobile/providers/infrastructure/setting.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/timeline.provider.dart';
 import 'package:immich_mobile/providers/shared_albums.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
+import 'package:immich_mobile/widgets/common/immich_thumbnail.dart';
 
 @RoutePage()
 class SharedAlbumsSettingsPage extends HookConsumerWidget {
@@ -21,15 +22,148 @@ class SharedAlbumsSettingsPage extends HookConsumerWidget {
     final albumsAsync = ref.watch(sharedAlbumsWithVisibilityProvider);
     final globalEnabled = ref.watch(showSharedAlbumsInTimelineProvider).value ?? false;
     final currentUser = ref.watch(currentUserProvider);
+    final searchQuery = useState('');
+    final showSearch = useState(false);
 
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
-        title: const Text('setting_manage_shared_albums_title').tr(),
+        title: showSearch.value
+            ? TextField(
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'setting_search_albums_hint'.tr(),
+                  border: InputBorder.none,
+                ),
+                style: context.textTheme.titleLarge,
+                onChanged: (value) => searchQuery.value = value,
+              )
+            : const Text('setting_manage_shared_albums_title').tr(),
+        actions: [
+          if (!showSearch.value)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) async {
+                final albums = albumsAsync.value ?? [];
+                final userId = currentUser?.id ?? '';
+                if (userId.isEmpty || albums.isEmpty) return;
+
+                bool? visibilityValue;
+                switch (value) {
+                  case 'show_all':
+                    visibilityValue = true;
+                    break;
+                  case 'hide_all':
+                    visibilityValue = false;
+                    break;
+                  case 'reset_all':
+                    visibilityValue = null;
+                    break;
+                }
+
+                // Apply to all albums
+                for (final albumWithVis in albums) {
+                  await ref.read(timelineRepositoryProvider).setAlbumTimelineVisibility(
+                    albumWithVis.album.id,
+                    userId,
+                    visibilityValue,
+                  );
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem<String>(
+                  value: 'show_all',
+                  child: Row(
+                    children: [
+                      Icon(Icons.visibility, color: context.primaryColor),
+                      const SizedBox(width: 12),
+                      Text('setting_batch_show_all'.tr()),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'hide_all',
+                  child: Row(
+                    children: [
+                      Icon(Icons.visibility_off, color: context.colorScheme.error),
+                      const SizedBox(width: 12),
+                      Text('setting_batch_hide_all'.tr()),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'reset_all',
+                  child: Row(
+                    children: [
+                      Icon(Icons.auto_mode, color: context.themeData.disabledColor),
+                      const SizedBox(width: 12),
+                      Text('setting_batch_reset_all'.tr()),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          IconButton(
+            icon: Icon(showSearch.value ? Icons.close : Icons.search),
+            onPressed: () {
+              showSearch.value = !showSearch.value;
+              if (!showSearch.value) {
+                searchQuery.value = '';
+              }
+            },
+          ),
+        ],
       ),
       body: albumsAsync.when(
         data: (albums) {
           if (albums.isEmpty) {
+            return RefreshIndicator(
+              onRefresh: () async {
+                ref.invalidate(sharedAlbumsWithVisibilityProvider);
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: SizedBox(
+                  height: MediaQuery.of(context).size.height - 100,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.photo_album_outlined,
+                            size: 64,
+                            color: context.themeData.disabledColor,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'setting_no_shared_albums'.tr(),
+                            style: context.textTheme.titleMedium?.copyWith(
+                              color: context.themeData.disabledColor,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          // Filter albums based on search query
+          final filteredAlbums = searchQuery.value.isEmpty
+              ? albums
+              : albums.where((albumWithVis) {
+                  final album = albumWithVis.album;
+                  final query = searchQuery.value.toLowerCase();
+                  return album.name.toLowerCase().contains(query) ||
+                         album.ownerName.toLowerCase().contains(query);
+                }).toList();
+
+          if (filteredAlbums.isEmpty && searchQuery.value.isNotEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
@@ -37,13 +171,13 @@ class SharedAlbumsSettingsPage extends HookConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.photo_album_outlined,
+                      Icons.search_off,
                       size: 64,
                       color: context.themeData.disabledColor,
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'setting_no_shared_albums'.tr(),
+                      'setting_no_albums_match_search'.tr(),
                       style: context.textTheme.titleMedium?.copyWith(
                         color: context.themeData.disabledColor,
                       ),
@@ -55,16 +189,21 @@ class SharedAlbumsSettingsPage extends HookConsumerWidget {
             );
           }
 
-          return ListView.builder(
-            itemCount: albums.length,
-            itemBuilder: (context, index) {
-              final albumWithVisibility = albums[index];
-              return _AlbumVisibilityTile(
-                albumWithVisibility: albumWithVisibility,
-                globalEnabled: globalEnabled,
-                userId: currentUser?.id ?? '',
-              );
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(sharedAlbumsWithVisibilityProvider);
             },
+            child: ListView.builder(
+              itemCount: filteredAlbums.length,
+              itemBuilder: (context, index) {
+                final albumWithVisibility = filteredAlbums[index];
+                return _AlbumVisibilityTile(
+                  albumWithVisibility: albumWithVisibility,
+                  globalEnabled: globalEnabled,
+                  userId: currentUser?.id ?? '',
+                );
+              },
+            ),
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -154,7 +293,16 @@ class _AlbumVisibilityTile extends HookConsumerWidget {
         child: album.thumbnailAssetId != null
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Icon(Icons.photo_album, color: context.themeData.disabledColor),
+                child: Image(
+                  image: ImmichThumbnail.imageProvider(
+                    assetId: album.thumbnailAssetId!,
+                    thumbnailSize: 256,
+                  ),
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(Icons.photo_album, color: context.themeData.disabledColor);
+                  },
+                ),
               )
             : Icon(Icons.photo_album_outlined, color: context.themeData.disabledColor),
       ),
