@@ -13,6 +13,12 @@ class RemoteAlbumUserEntity extends Table with DriftDefaultsMixin {
 
   IntColumn get role => intEnum<AlbumUserRole>()();
 
+  /// Controls whether this album's assets appear in the user's timeline
+  /// - null: inherit from global "show shared albums" setting (default)
+  /// - true: explicitly show this album in timeline
+  /// - false: explicitly hide this album from timeline
+  BoolColumn get showInTimeline => boolean().nullable()();
+
   @override
   Set<Column> get primaryKey => {albumId, userId};
 }

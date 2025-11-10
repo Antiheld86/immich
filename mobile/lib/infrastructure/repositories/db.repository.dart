@@ -93,7 +93,7 @@ class Drift extends $Drift implements IDatabaseRepository {
   }
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -177,6 +177,10 @@ class Drift extends $Drift implements IDatabaseRepository {
                 ),
               );
             }
+          },
+          from12To13: (m, v13) async {
+            // Add showInTimeline column to remote_album_user_entity for per-album timeline control
+            await m.addColumn(v13.remoteAlbumUserEntity, v13.remoteAlbumUserEntity.showInTimeline);
           },
         ),
       );
