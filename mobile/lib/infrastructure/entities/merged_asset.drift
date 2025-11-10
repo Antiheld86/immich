@@ -4,7 +4,7 @@ import 'local_asset.entity.dart';
 import 'local_album.entity.dart';
 import 'local_album_asset.entity.dart';
 
-mergedAsset: 
+mergedAsset:
 SELECT
 	rae.id as remote_id,
 	(SELECT lae.id FROM local_asset_entity lae WHERE lae.checksum = rae.checksum LIMIT 1) as local_id,
@@ -30,6 +30,41 @@ WHERE
 	rae.deleted_at IS NULL
 	AND rae.visibility = 0 -- timeline visibility
 	AND rae.owner_id IN :user_ids
+	AND (
+		rae.stack_id IS NULL
+		OR rae.id = se.primary_asset_id
+	)
+
+UNION ALL
+
+-- Include assets from selected shared albums (when sharedAlbumIds is provided)
+SELECT
+	rae.id as remote_id,
+	(SELECT lae.id FROM local_asset_entity lae WHERE lae.checksum = rae.checksum LIMIT 1) as local_id,
+	rae.name,
+	rae."type",
+	rae.created_at as created_at,
+	rae.updated_at,
+	rae.width,
+	rae.height,
+	rae.duration_in_seconds,
+	rae.is_favorite,
+	rae.thumb_hash,
+	rae.checksum,
+	rae.owner_id,
+	rae.live_photo_video_id,
+	0 as orientation,
+	rae.stack_id
+FROM
+	remote_asset_entity rae
+LEFT JOIN
+	stack_entity se ON rae.stack_id = se.id
+INNER JOIN
+	remote_album_asset_entity raae ON rae.id = raae.asset_id
+WHERE
+	rae.deleted_at IS NULL
+	AND rae.visibility = 0 -- timeline visibility
+	AND raae.album_id IN :shared_album_ids
 	AND (
 		rae.stack_id IS NULL
 		OR rae.id = se.primary_asset_id
@@ -91,6 +126,24 @@ FROM
 		rae.deleted_at IS NULL
 		AND rae.visibility = 0 -- timeline visibility
 		AND rae.owner_id in :user_ids
+		AND (
+			rae.stack_id IS NULL
+			OR rae.id = se.primary_asset_id
+		)
+	UNION ALL
+	-- Include assets from selected shared albums
+	SELECT
+		rae.created_at
+	FROM
+		remote_asset_entity rae
+	LEFT JOIN
+		stack_entity se ON rae.stack_id = se.id
+	INNER JOIN
+		remote_album_asset_entity raae ON rae.id = raae.asset_id
+	WHERE
+		rae.deleted_at IS NULL
+		AND rae.visibility = 0 -- timeline visibility
+		AND raae.album_id IN :shared_album_ids
 		AND (
 			rae.stack_id IS NULL
 			OR rae.id = se.primary_asset_id

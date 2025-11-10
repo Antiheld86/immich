@@ -50,7 +50,8 @@ class TimelineFactory {
     return group == GroupAssetsBy.auto ? GroupAssetsBy.day : group;
   }
 
-  TimelineService main(List<String> timelineUsers) => TimelineService(_timelineRepository.main(timelineUsers, groupBy));
+  TimelineService main(List<String> timelineUsers, {List<String> sharedAlbumIds = const []}) =>
+    TimelineService(_timelineRepository.main(timelineUsers, groupBy, sharedAlbumIds: sharedAlbumIds));
 
   TimelineService localAlbum({required String albumId}) =>
       TimelineService(_timelineRepository.localAlbum(albumId, groupBy));

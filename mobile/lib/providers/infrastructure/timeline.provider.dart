@@ -4,6 +4,7 @@ import 'package:immich_mobile/infrastructure/repositories/timeline.repository.da
 import 'package:immich_mobile/presentation/widgets/timeline/timeline.state.dart';
 import 'package:immich_mobile/providers/infrastructure/db.provider.dart';
 import 'package:immich_mobile/providers/infrastructure/setting.provider.dart';
+import 'package:immich_mobile/providers/shared_albums.provider.dart';
 import 'package:immich_mobile/providers/user.provider.dart';
 
 final timelineRepositoryProvider = Provider<DriftTimelineRepository>(
@@ -17,7 +18,8 @@ final timelineArgsProvider = Provider.autoDispose<TimelineArgs>(
 final timelineServiceProvider = Provider<TimelineService>(
   (ref) {
     final timelineUsers = ref.watch(timelineUsersProvider).valueOrNull ?? [];
-    final timelineService = ref.watch(timelineFactoryProvider).main(timelineUsers);
+    final sharedAlbumIds = ref.watch(selectedSharedAlbumIdsProvider).valueOrNull ?? [];
+    final timelineService = ref.watch(timelineFactoryProvider).main(timelineUsers, sharedAlbumIds: sharedAlbumIds);
     ref.onDispose(timelineService.dispose);
     return timelineService;
   },

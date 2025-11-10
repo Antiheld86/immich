@@ -32,26 +32,26 @@ class DriftTimelineRepository extends DriftDatabaseRepository {
         .map((users) => users..add(userId));
   }
 
-  TimelineQuery main(List<String> userIds, GroupAssetsBy groupBy) => (
-    bucketSource: () => _watchMainBucket(userIds, groupBy: groupBy),
-    assetSource: (offset, count) => _getMainBucketAssets(userIds, offset: offset, count: count),
+  TimelineQuery main(List<String> userIds, GroupAssetsBy groupBy, {List<String> sharedAlbumIds = const []}) => (
+    bucketSource: () => _watchMainBucket(userIds, groupBy: groupBy, sharedAlbumIds: sharedAlbumIds),
+    assetSource: (offset, count) => _getMainBucketAssets(userIds, offset: offset, count: count, sharedAlbumIds: sharedAlbumIds),
     origin: TimelineOrigin.main,
   );
 
-  Stream<List<Bucket>> _watchMainBucket(List<String> userIds, {GroupAssetsBy groupBy = GroupAssetsBy.day}) {
+  Stream<List<Bucket>> _watchMainBucket(List<String> userIds, {GroupAssetsBy groupBy = GroupAssetsBy.day, List<String> sharedAlbumIds = const []}) {
     if (groupBy == GroupAssetsBy.none) {
       throw UnsupportedError("GroupAssetsBy.none is not supported for watchMainBucket");
     }
 
-    return _db.mergedAssetDrift.mergedBucket(userIds: userIds, groupBy: groupBy.index).map((row) {
+    return _db.mergedAssetDrift.mergedBucket(userIds: userIds, sharedAlbumIds: sharedAlbumIds, groupBy: groupBy.index).map((row) {
       final date = row.bucketDate.truncateDate(groupBy);
       return TimeBucket(date: date, assetCount: row.assetCount);
     }).watch();
   }
 
-  Future<List<BaseAsset>> _getMainBucketAssets(List<String> userIds, {required int offset, required int count}) {
+  Future<List<BaseAsset>> _getMainBucketAssets(List<String> userIds, {required int offset, required int count, List<String> sharedAlbumIds = const []}) {
     return _db.mergedAssetDrift
-        .mergedAsset(userIds: userIds, limit: (_) => Limit(count, offset))
+        .mergedAsset(userIds: userIds, sharedAlbumIds: sharedAlbumIds, limit: (_) => Limit(count, offset))
         .map(
           (row) => row.remoteId != null && row.ownerId != null
               ? RemoteAsset(
